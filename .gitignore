@@ -1,5 +1,9 @@
+package-lock.json
+
+storage-module
+
 aws-config.json
 
-storage-module/build
-
 node_modules
+
+
