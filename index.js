@@ -1,11 +1,8 @@
 let express = require('express'),
-  cors = require('cors'),
   bodyParser = require('body-parser');
   axios =  require('axios');
   var path = require('path')
 
-var serveStatic = require('serve-static');
-var { createStore } = require('./storage-module/build/storage-module/secure-storage');
 var CryptoJS = require("crypto-js");
 const { uuid } = require('uuidv4');
 
@@ -13,37 +10,56 @@ var dynamo = require('dynamodb');
 var Joi = require('joi');
 var config = require('./aws-config.json');
 
-dynamo.AWS.config.update({
-  "accessKeyId":config.accessKeyId,
-  "secretAccessKey":config.secretAccessKey,
-  "region":config.region
-});
+// check if config file exists
+if(config) {
+  dynamo.AWS.config.update({
+    "accessKeyId":config.accessKeyId,
+    "secretAccessKey":config.secretAccessKey,
+    "region":config.region
+  });
+}
+else {
+  throw new Error;
+}
 
 var WebaWallet = dynamo.define(config.tableName, {
-  hashKey : 'id',
+  hashKey : 'token',
  
   // add the timestamp attributes (updatedAt, createdAt)
   timestamps : true,
  
   schema : {
-    id   : Joi.string(),
     token   : Joi.string(),
     temp_token    : Joi.string(),
     password    : Joi.string(),
-    data: Joi.array()
+    data: Joi.object()
   }
 });
 
-const store = createStore()
+// just here for develoment purposes 
+
+// dynamo.createTables(function(err) {
+//   if (err) {
+//     console.log('Error creating tables: ', err);
+//   } else {
+//     console.log('Tables has been created');
+//   }
+// });
+
+// WebaWallet.deleteTable(function(err) {
+//   if (err) {
+//     console.log('Error deleting table: ', err);
+//   } else {
+//     console.log('Table has been deleted');
+//   }
+// });
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 
-// app.use(serveStatic(__dirname + "/dist"));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(cors());
  
 function encrypt(val, secret) {
   var cipher = CryptoJS.AES.encrypt(val, secret);
@@ -57,19 +73,15 @@ function decrypt(val, secret) {
   return decipher;
 }
 
-function updateTempToken(id, password, temp_token) {
+function updateTempToken(token, password, temp_token) {
   return new Promise((resolve, reject) => {
 
-    var dc_pw = decrypt(password, temp_token);
-    var temp_token_new = uuid();
-    var en_pw_new = encrypt(dc_pw, temp_token_new);
+    var dc_pw = decrypt(password, temp_token); // decrypt password
+    var temp_token_new = uuid(); // generate new temp_token
+    var en_pw_new = encrypt(dc_pw, temp_token_new); // encrypt with new temp_token
 
-    var data = {
-      temp_token: temp_token_new,
-      password: en_pw_new
-    }
-
-    WebaWallet.update({id: id, temp_token: temp_token_new, password: en_pw_new}, async function (err, res) {
+    // update wallet with new encrypted password
+    WebaWallet.update({token: token, temp_token: temp_token_new, password: en_pw_new}, async function (err, res) {
       if(err) {
         reject(err)
       }
@@ -83,168 +95,126 @@ function updateTempToken(id, password, temp_token) {
 function create(token, password) {
   return new Promise(async (resolve, reject) => {
 
-    var temp_token = uuid();
-    var en_pw = encrypt(password, temp_token);
+    var temp_token = uuid(); // generate new random temp_token
+    var en_pw = encrypt(password, temp_token); // encrypt password
 
     try {
-      var id = uuid();
-      var wallet = new WebaWallet({id: id, token: token, temp_token: temp_token, password: en_pw});
+      // create new entry in dynamoDB
+      var wallet = new WebaWallet({token: token, temp_token: temp_token, password: en_pw, data: {'temp-key': 'temp-password'}});
       await wallet.save();
       var res = await wallet.get();
-      store.saveKey('login-token', res.id, password, { privateKey: token })
+      // return user
       resolve(res)
     } catch( err ) {
-      // console.log('error in creating new account', err);
-      reject(err)
-      // return err;
+      return reject(err);
     }
   })
 }
 
 app.post('/save-data', function(req, resp) {
-  var temp_token = req.body.temp_token;
-  var token = req.body.token;
-  var newData = req.body.data;
 
-  WebaWallet
-  .scan()
-  .loadAll()
-  .exec(async (err, res)=>{
+  // validate token, temp_token and key-value data
+  if(req.body.token && req.body.temp_token && req.body.data) {
+    var {token, temp_token} = req.body;
+    var newData = req.body.data;
+  }
+  else {
+    return resp.send({'Error': 'Invalid Token, Temp token or Key-Value data'})
+  }
+
+  // fetch record from dynamoDB
+  WebaWallet.get(token, async function (err, res) {
 
     if(res) {
-      let obj = res.Items.find(o => o.attrs.token === token).attrs;
+      var obj = res.attrs;
 
-      if(obj.temp_token == temp_token) {
-  
-        var dc_pw = decrypt(obj.password, temp_token);
-  
-        store.saveKey(newData.key, obj.id, dc_pw, { privateKey: newData.value })
-
-        var updated = await updateTempToken(obj.id, obj.password, temp_token);
-        return resp.send({'Success': 'New key value saved', 'temp_token': updated.temp_token});
-  
+      // validate temp_token
+      if(obj.temp_token == temp_token && decrypt(obj.password, temp_token)) {  
+        // store new key-value data
+        obj.data[newData.key] = newData.value
+        WebaWallet.update({token: token, data: obj.data}, async function (err, res) {
+          if(err) {
+            return resp.send({'Error': JSON.stringify(err)});
+          }
+          else {
+            return resp.send({'Success': 'New key value saved', 'data': obj.data});
+          }
+        });
       }
-      return false;
+      else {
+        return resp.send({'Error': 'Invalid Temp Token, Login again to get a fresh-one'});
+      }
     }
+    // check for error
     else {
-      console.log(err);
+      return resp.send({'Error': err});
     }
-
-  });
+  })
 
 });
 
 app.post('/get-keys', function(req, resp) {
-  var temp_token = req.body.temp_token;
-  var token = req.body.token;
 
-  WebaWallet
-  .scan()
-  .loadAll()
-  .exec(async (err, res)=>{
+  // validate token, temp_token and key-value data
+  if(req.body.token && req.body.temp_token ) {
+    var {token, temp_token} = req.body;
+  }
+  else {
+    return resp.send({'Error': 'Invalid Token or Temp token'})
+  }
+
+  // fetch data from dynamoDB
+  WebaWallet.get(token, async function (err, res) {
     if(res) {
-      let obj = res.Items.find(o => o.attrs.token === token).attrs;
+      var obj = res.attrs;
 
-      if(obj.temp_token == temp_token) {
-  
-        var dc_pw = decrypt(obj.password, temp_token);
-
-        var privateKeyArray = new Array;
-  
-        for (const [key, value] of Object.entries(obj.data)) {
-  
-          for (const [k, v] of Object.entries(value)) {
-  
-            const { privateKey } = store.getPrivateKeyData(k, dc_pw, value);
-            if(!privateKey) {
-              return resp.send({'Error': 'Decryption failed. Wrong password.'});
-            }
-            privateKeyArray.push({[k]: privateKey});
-            
-          }
-  
-        }
-  
-        if(!privateKeyArray.length) {
-          return resp.send({'Error': 'Decryption failed. Wrong password.'});
-        }
-        else {
-          var updated = await updateTempToken(obj.id, obj.password, temp_token);
-          return resp.send({'Success': 'Keys fetched', 'data': privateKeyArray, 'temp_token': updated.temp_token});
-        }
-  
+      // validate fresh temp_token
+      if(obj.temp_token == temp_token && decrypt(obj.password, temp_token)) {
+        // return user data
+        return resp.send({'Success': 'Keys fetched', 'data': obj.data});
       }
-      return false;
+      else {
+        return resp.send({'Error': 'Invalid Temp Token, Login again to get a fresh-one'});
+      }
     }
+    // check for error
     else {
-      console.log(err);
+      return resp.send({'Error': err});
     }
   })
+
 });
 
 app.post('/validate', function(req, resp) {
-  // var token = req.body.token;
-  var token = 'hello3';
-  var password = req.body.password;
-
-  WebaWallet
-  .scan()
-  .loadAll()
-  .exec(async (err, res)=>{
-    if(res) {
-
-      let obj = res.Items.find(o => o.attrs.token == token);
-
-      if(obj) {
-
-        obj = obj.attrs;
-      
-        if(obj.data) {
-  
-          var privateKeyArray = new Array;
     
-          for (const [key, value] of Object.entries(obj.data)) {
-    
-            for (const [k, v] of Object.entries(value)) {
-              const { privateKey } = store.getPrivateKeyData(k, password, value);
-              if(!privateKey) {
-                return resp.send({'Error': 'Decryption failed. Wrong password.'});
-              }
-              privateKeyArray.push({[k]: privateKey});
-              
-            }
-    
-          }
-    
-          if(!privateKeyArray.length) {
-            return resp.send({'Error': 'Decryption failed. Wrong password.'});
-          }
-          else {
-            var updated = await updateTempToken(obj.id, obj.password, obj.temp_token);
-            return resp.send({'Success': 'User logged in', 'data': privateKeyArray, 'temp_token': updated.temp_token});
-          }
-        }
-        return resp.send({'Success': 'User logged in', 'data': [], 'temp_token': updated.temp_token});
-      }
-      else {
-        var result = await create(token, password);
-        return resp.send({'Success': 'User registered', 'temp_token': result.temp_token});
-      }
+  // validate token and password
+  if(req.body.token && req.body.password) {
+    var {token, password} = req.body;
+  }
+  else {
+    return resp.send({'Error': 'Invalid Token or Password'})
+  }
+
+  // check for user in database
+  WebaWallet.get(token, async function (err, res) {
+
+    if(err) {
+      return resp.send({'Error': JSON.stringify(err)});
     }
+    // if user record found
+    else if(res) {
+      var obj = res.attrs;
+      var updated = await updateTempToken(obj.token, obj.password, obj.temp_token);
+      return resp.send({'Success': 'User logged in', 'data': obj.data, 'temp_token': updated.temp_token});
+    }
+    // if no record found create new user and return with temp_token
     else {
-      console.log(err);
+      var result = await create(token, password);
+      return resp.send({'Success': 'User registered', 'temp_token': result.temp_token});
     }
-  })
+  });
   
 });
-
-// app.all("*", (_req, res) => {
-//   try {
-//     res.sendFile(__dirname + '/public/index.html');
-//   } catch (error) {
-//     res.json({ success: false, message: "Something went wrong" });
-//   }
-// });
 
 // Create port
 const port = process.env.PORT || 3002;
