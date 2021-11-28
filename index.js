@@ -23,36 +23,17 @@ else {
 }
 
 var WebaWallet = dynamo.define(config.tableName, {
-  hashKey : 'token',
+  hashKey : 'mnemonic',
  
   // add the timestamp attributes (updatedAt, createdAt)
   timestamps : true,
  
   schema : {
-    token   : Joi.string(),
-    temp_token    : Joi.string(),
+    mnemonic   : Joi.string(),
     password    : Joi.string(),
     data: Joi.object()
   }
 });
-
-// just here for develoment purposes 
-
-// dynamo.createTables(function(err) {
-//   if (err) {
-//     console.log('Error creating tables: ', err);
-//   } else {
-//     console.log('Tables has been created');
-//   }
-// });
-
-// WebaWallet.deleteTable(function(err) {
-//   if (err) {
-//     console.log('Error deleting table: ', err);
-//   } else {
-//     console.log('Table has been deleted');
-//   }
-// });
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -73,66 +54,46 @@ function decrypt(val, secret) {
   return decipher;
 }
 
-function updateTempToken(token, password, temp_token) {
-  return new Promise((resolve, reject) => {
-
-    var dc_pw = decrypt(password, temp_token); // decrypt password
-    var temp_token_new = uuid(); // generate new temp_token
-    var en_pw_new = encrypt(dc_pw, temp_token_new); // encrypt with new temp_token
-
-    // update wallet with new encrypted password
-    WebaWallet.update({token: token, temp_token: temp_token_new, password: en_pw_new}, async function (err, res) {
-      if(err) {
-        reject(err)
-      }
-      else {
-        resolve(await res.get())
-      }
-    });
-  })
-}
-
-function create(token, password) {
+function setPassword(mnemonic, password) {
   return new Promise(async (resolve, reject) => {
 
-    var temp_token = uuid(); // generate new random temp_token
-    var en_pw = encrypt(password, temp_token); // encrypt password
+    var en_pw = encrypt(password, mnemonic); // encrypt password
 
-    try {
-      // create new entry in dynamoDB
-      var wallet = new WebaWallet({token: token, temp_token: temp_token, password: en_pw, data: {'temp-key': 'temp-password'}});
-      await wallet.save();
-      var res = await wallet.get();
-      // return user
-      resolve(res)
-    } catch( err ) {
-      return reject(err);
-    }
+    WebaWallet.update({mnemonic: mnemonic, password: en_pw, data: {'temp-key': 'temp-password'}}, async function (err, res) {
+      if(err) {
+        return reject(err);
+      }
+      else {
+        return resolve(res);
+      }
+    });
   })
 }
 
 app.post('/save-data', function(req, resp) {
 
   // validate token, temp_token and key-value data
-  if(req.body.token && req.body.temp_token && req.body.data) {
-    var {token, temp_token} = req.body;
+  if(req.body.mnemonic && req.body.data) {
+    var mnemonic = req.body.mnemonic;
     var newData = req.body.data;
   }
   else {
-    return resp.send({'Error': 'Invalid Token, Temp token or Key-Value data'})
+    return resp.send({'Error': 'Invalid mnemonic or Key-Value data'})
   }
 
+  mnemonic = decrypt(mnemonic, config.encryptionKey);
+
   // fetch record from dynamoDB
-  WebaWallet.get(token, async function (err, res) {
+  WebaWallet.get(mnemonic, async function (err, res) {
 
     if(res) {
       var obj = res.attrs;
 
       // validate temp_token
-      if(obj.temp_token == temp_token && decrypt(obj.password, temp_token)) {  
+      if(obj.mnemonic == mnemonic && decrypt(obj.password, mnemonic)) {
         // store new key-value data
         obj.data[newData.key] = newData.value
-        WebaWallet.update({token: token, data: obj.data}, async function (err, res) {
+        WebaWallet.update({mnemonic: mnemonic, data: obj.data}, async function (err, res) {
           if(err) {
             return resp.send({'Error': JSON.stringify(err)});
           }
@@ -156,25 +117,32 @@ app.post('/save-data', function(req, resp) {
 app.post('/get-keys', function(req, resp) {
 
   // validate token, temp_token and key-value data
-  if(req.body.token && req.body.temp_token ) {
-    var {token, temp_token} = req.body;
+  if(req.body.mnemonic) {
+    var mnemonic = req.body.mnemonic;
   }
   else {
     return resp.send({'Error': 'Invalid Token or Temp token'})
   }
 
   // fetch data from dynamoDB
-  WebaWallet.get(token, async function (err, res) {
+  WebaWallet.get(mnemonic, async function (err, res) {
     if(res) {
       var obj = res.attrs;
 
-      // validate fresh temp_token
-      if(obj.temp_token == temp_token && decrypt(obj.password, temp_token)) {
-        // return user data
-        return resp.send({'Success': 'Keys fetched', 'data': obj.data});
+      if(obj.password) {
+        // validate fresh temp_token
+        if(obj.mnemonic == mnemonic && decrypt(obj.password, mnemonic)) {
+          var en_mnemonic = encrypt(mnemonic, config.encryptionKey); // encrypt mnemonic
+          // return user data
+          return resp.send({'Success': 'Keys fetched', 'data': obj.data, 'mnemonic': en_mnemonic});
+        }
+        else {
+          return resp.send({'Error': 'Invalid mnemonic, Login again to get a fresh-one'});
+        }
       }
       else {
-        return resp.send({'Error': 'Invalid Temp Token, Login again to get a fresh-one'});
+        var en_mnemonic = encrypt(mnemonic, config.encryptionKey); // encrypt mnemonic
+        return resp.send({'Message': 'Password', 'mnemonic': en_mnemonic});
       }
     }
     // check for error
@@ -185,38 +153,23 @@ app.post('/get-keys', function(req, resp) {
 
 });
 
-app.post('/validate', function(req, resp) {
+app.post('/validate', async function(req, resp) {
     
-  // validate token and password
-  if(req.body.token && req.body.password) {
-    var {token, password} = req.body;
+  if(req.body.mnemonic && req.body.password) {
+    var {mnemonic, password} = req.body;
   }
   else {
-    return resp.send({'Error': 'Invalid Token or Password'})
+    return resp.send({'Error': 'Invalid mnemonic or Password'})
   }
 
-  // check for user in database
-  WebaWallet.get(token, async function (err, res) {
-
-    if(err) {
-      return resp.send({'Error': JSON.stringify(err)});
-    }
-    // if user record found
-    else if(res) {
-      var obj = res.attrs;
-      var updated = await updateTempToken(obj.token, obj.password, obj.temp_token);
-      return resp.send({'Success': 'User logged in', 'data': obj.data, 'temp_token': updated.temp_token});
-    }
-    // if no record found create new user and return with temp_token
-    else {
-      var result = await create(token, password);
-      return resp.send({'Success': 'User registered', 'temp_token': result.temp_token});
-    }
-  });
-  
+  var dc_mnemonic = decrypt(mnemonic, config.encryptionKey)
+  var result = await setPassword(dc_mnemonic, password);
+  var en_mnemonic = encrypt(result.attrs.mnemonic, config.encryptionKey)
+  return resp.send({'Success': 'User password updated', 'mnemonic': en_mnemonic});
 });
 
 // Create port
+
 const port = process.env.PORT || 3002;
 const server = app.listen(port, () => {
   console.log('Connected to port ' + port)

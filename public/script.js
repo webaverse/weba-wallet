@@ -1,35 +1,42 @@
 $(document).ready(function() { 
-  window.opener.postMessage('received', 'https://secure.webaverse.com');
+  window.opener.postMessage('received', 'secure.webaverse.com');
  });
 
 window.addEventListener("message", receiveMessage, false);
-var token = '';
+var mnemonic = '';
 var source = '';
 var origin = '';
 
 function receiveMessage(event){
-if (event.origin !== 'https://secure.webaverse.com')
+if (event.origin !== 'secure.webaverse.com')
     return;
 
-    if(JSON.parse(event.data).temp_token) {
-      if(JSON.parse(event.data).data) {
-        saveData(JSON.parse(event.data).temp_token, JSON.parse(event.data).token, JSON.parse(event.data).data)
-      }
-      else {
-        getKeys(JSON.parse(event.data).temp_token, JSON.parse(event.data).token);
-      }
-    }
-
-    token = JSON.parse(event.data).token;
     source = event.source;
     origin = event.origin;
 
+    if(JSON.parse(event.data).mnemonic) {
+
+      mnemonic = JSON.parse(event.data).mnemonic;
+
+      if(JSON.parse(event.data).data) {
+        saveData(mnemonic, JSON.parse(event.data).data)
+      }
+      else {
+        getKeys(mnemonic);
+      }
+    }
+    else if(JSON.parse(event.data).p_mnemonic) {
+        mnemonic = JSON.parse(event.data).p_mnemonic;
+    }
+    else {
+        return source.postMessage({"Error": "Invalid mnemonic"}, origin);
+    }
+
 }
 
-function saveData(temp_token, token, newData) {
+function saveData(mnemonic, newData) {
     var data = {
-        token: token,
-        temp_token: temp_token,
+        mnemonic: mnemonic,
         data: newData
     };
 
@@ -46,10 +53,9 @@ function saveData(temp_token, token, newData) {
         });
 }
 
-function getKeys(temp_token, token) {
+function getKeys(mnemonic) {
     var data = {
-        token: token,
-        temp_token: temp_token,
+        mnemonic: mnemonic,
     };
 
     fetch('/get-keys', {
@@ -61,7 +67,6 @@ function getKeys(temp_token, token) {
         })
         .then(response => response.json())
         .then(json => {
-
             source.postMessage(json, origin);
         });
 }
@@ -69,7 +74,7 @@ function getKeys(temp_token, token) {
 function submit() {
 
     var data = {
-        token: token,
+        mnemonic: mnemonic,
         password: document.getElementById("password").value
     };
 
