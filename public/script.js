@@ -1,5 +1,5 @@
 $(document).ready(function() { 
-  window.opener.postMessage('received', 'secure.webaverse.com');
+  window.opener.postMessage('received', 'app.webaverse.com');
  });
 
 window.addEventListener("message", receiveMessage, false);
@@ -8,7 +8,7 @@ var source = '';
 var origin = '';
 
 function receiveMessage(event){
-if (event.origin !== 'secure.webaverse.com')
+if (event.origin !== 'app.webaverse.com')
     return;
 
     source = event.source;
