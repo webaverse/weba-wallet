@@ -5,6 +5,7 @@ $(document).ready(function() {
 window.addEventListener("message", receiveMessage, false);
 var source = '';
 var origin = '';
+const password = 'webawallet';
 
 function receiveMessage(event){
 
@@ -41,7 +42,7 @@ function decrypt(val, secret) {
 }
 
 function saveData(key, value) {
-    var en_value = encrypt(value, 'password');
+    var en_value = encrypt(value, password);
     var currData = localStorage.getItem('data');
     if(currData) {
         var newData = JSON.parse(currData);
@@ -62,7 +63,7 @@ function getKeys(key) {
     if(key) {
         var value = JSON.parse(localStorage.getItem('data'))[key];
         if(value) {
-            var dc_value = decrypt(value, 'password');
+            var dc_value = decrypt(value, password);
             result[key] = dc_value;
         }
         else {
@@ -71,7 +72,7 @@ function getKeys(key) {
     }
     else if(JSON.parse(localStorage.getItem('data'))) {
       for (const [key, value] of Object.entries(JSON.parse(localStorage.getItem('data')))) {
-        var dc_value = decrypt(value, 'password');
+        var dc_value = decrypt(value, password);
         result[key] = dc_value;
       }
     }
@@ -79,7 +80,7 @@ function getKeys(key) {
 }
 
 function lockedFn() {
-    var val = document.getElementById("password").value;
+    var val = document.getElementById(password).value;
     if(val) {
         document.getElementById("login").disabled = false;
     }
