@@ -69,7 +69,7 @@ function getKeys(key) {
             source.postMessage({"Error": err}, origin);
         }
     }
-    else {
+    else if(JSON.parse(localStorage.getItem('data'))) {
       for (const [key, value] of Object.entries(JSON.parse(localStorage.getItem('data')))) {
         var dc_value = decrypt(value, 'password');
         result[key] = dc_value;
