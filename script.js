@@ -1,5 +1,5 @@
 $(document).ready(function() { 
-    window.opener.postMessage('received', 'app.webaverse.com');
+    window.opener.postMessage('received', 'http://localhost:3000');
  });
 
 window.addEventListener("message", receiveMessage, false);
@@ -8,7 +8,7 @@ var origin = '';
 
 function receiveMessage(event){
 
-    if (event.origin !== 'app.webaverse.com')
+    if (event.origin !== 'http://localhost:3000')
         return;
 
     source = event.source;
