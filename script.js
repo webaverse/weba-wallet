@@ -60,21 +60,25 @@ function saveData(key, value) {
 function getKeys(key) {
 
     var result = {};
-    if(key) {
-        var value = JSON.parse(localStorage.getItem('data'))[key];
-        if(value) {
+    if(JSON.parse(localStorage.getItem('data'))) {
+        if(key) {
+            if(key in JSON.parse(localStorage.getItem('data'))) {
+                var value = JSON.parse(localStorage.getItem('data'))[key];
+                if(value) {
+                    var dc_value = decrypt(value, password);
+                    result[key] = dc_value;
+                }
+            }
+            else {
+                source.postMessage({"Error": "Key doesn't exist"}, origin);
+            }
+        }
+        else if(JSON.parse(localStorage.getItem('data'))) {
+          for (const [key, value] of Object.entries(JSON.parse(localStorage.getItem('data')))) {
             var dc_value = decrypt(value, password);
             result[key] = dc_value;
+          }
         }
-        else {
-            source.postMessage({"Error": err}, origin);
-        }
-    }
-    else if(JSON.parse(localStorage.getItem('data'))) {
-      for (const [key, value] of Object.entries(JSON.parse(localStorage.getItem('data')))) {
-        var dc_value = decrypt(value, password);
-        result[key] = dc_value;
-      }
     }
     source.postMessage(result, origin);
 }
