@@ -55,9 +55,6 @@ $ http-server
 
 Now your website is hosted on 8080
 
->### Doesn't Re-compile automatically
->The application won't hot reload itself automatically if there is any changes to any file. You have re-run application to effect new changes.
-
 ## Development Environment Setup
 
   
