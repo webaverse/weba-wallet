@@ -77,4 +77,4 @@ Now your website is hosted on 8080
 
 ## Login Flow
 
-![App - Wallet Login Flow](https://ibb.co/frJL3Xt)
+![App - Wallet Login Flow](https://i.ibb.co/Yfgw5N8/Wallet.jpg)
