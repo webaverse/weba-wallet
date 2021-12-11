@@ -1,15 +1,15 @@
 $(document).ready(function() { 
-    window.opener.postMessage('received', 'https://app.webaverse.com');
+    window.opener.postMessage('received', '*');
  });
 
 window.addEventListener("message", receiveMessage, false);
 var source = '';
-var origin = '';
+var origin = '*';
 const password = 'webawallet';
 
 function receiveMessage(event){
 
-    if (event.origin !== 'https://app.webaverse.com')
+    if (!event.origin.includes('webaverse.com'))
         return;
 
     source = event.source;
