@@ -15,17 +15,22 @@ function receiveMessage(event){
     source = event.source;
     origin = event.origin;
     
-    if(JSON.parse(event.data).action == 'getKey') {
-        getKeys(JSON.parse(event.data).key);
-    }
-    else if(JSON.parse(event.data).action == 'getAllKeys') {
-        getKeys();
-    }
-    else if(JSON.parse(event.data).action == 'storeKey') {
-        saveData(JSON.parse(event.data).key, JSON.parse(event.data).value);
-    }
-    else {
-       return source.postMessage({"Error": "Invalid request"}, origin);
+    try{
+        if(JSON.parse(event.data).action == 'getKey') {
+            getKeys(JSON.parse(event.data).key);
+        }
+        else if(JSON.parse(event.data).action == 'getAllKeys') {
+            getKeys();
+        }
+        else if(JSON.parse(event.data).action == 'storeKey') {
+            saveData(JSON.parse(event.data).key, JSON.parse(event.data).value);
+        }
+        else {
+           return source.postMessage({"Error": "Invalid request"}, origin);
+        }
+
+    }catch(e){
+        //ignore error as it comes due to non-string params.
     }
 }
 
