@@ -9,7 +9,7 @@ const password = 'webawallet';
 
 function receiveMessage(event){
 
-    if (!event.origin.includes('webaverse.com'))
+    if (!event.origin === 'https://app.webaverse.com' && !event.origin === 'https://staging.webaverse.com'))
         return;
 
     source = event.source;
