@@ -1,7 +1,5 @@
 $(document).ready(function() {
-    debugger;
-    console.log(window.opener);
-    window.opener.postMessage('received', '*');
+    window.parent.postMessage('received', '*');
  });
 
 window.addEventListener("message", receiveMessage, false);
