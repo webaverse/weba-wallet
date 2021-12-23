@@ -1,7 +1,3 @@
-$(document).ready(function() {
-    window.parent.postMessage('received', '*');
- });
-
 window.addEventListener("message", receiveMessage, false);
 var source = '';
 var origin = '*';
@@ -9,7 +5,7 @@ const password = 'webawallet';
 
 function receiveMessage(event){
 
-    if (!event.origin.endsWith('webaverse.com')  || !event.isTrusted)
+    if (!event.origin.endsWith('webaverse.com') || event.origin.endsWith('wallet.weabaverse.com')  || !event.isTrusted)
         return;
 
     source = event.source;
