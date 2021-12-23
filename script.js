@@ -3,6 +3,11 @@ var source = '';
 var origin = '*';
 const password = 'webawallet';
 
+
+window.parent.postMessage({
+    method: 'wallet_launched'
+}, origin);
+
 function receiveMessage(event){
 
     if (!event.origin.endsWith('webaverse.com') || event.origin.endsWith('wallet.webaverse.com')  || !event.isTrusted)
