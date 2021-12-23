@@ -1,4 +1,6 @@
-$(document).ready(function() { 
+$(document).ready(function() {
+    debugger;
+    console.log(window.opener);
     window.opener.postMessage('received', '*');
  });
 
