@@ -12,14 +12,14 @@ function receiveMessage(event){
     origin = event.origin;
     
     try{
-        if(JSON.parse(event.data).action == 'getKey') {
-            getKeys(JSON.parse(event.data).key);
+        if(event.data.action == 'getKey') {
+            getKeys(event.data.key);
         }
-        else if(JSON.parse(event.data).action == 'getAllKeys') {
+        else if(event.data.action == 'getAllKeys') {
             getKeys();
         }
-        else if(JSON.parse(event.data).action == 'storeKey') {
-            saveData(JSON.parse(event.data).key, JSON.parse(event.data).value);
+        else if(event.data.action == 'storeKey') {
+            saveData(event.data.key, event.data.value);
         }
         else {
            return source.postMessage({"Error": "Invalid request"}, origin);
