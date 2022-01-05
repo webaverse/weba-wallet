@@ -9,7 +9,6 @@ const loginEndpoint = 'https://login.webaverse.com';
 const accountsHost = `https://${chainName}sidechain-accounts.webaverse.com`;
 
 
-
 window.addEventListener("message", receiveMessage, false);
 
 window.parent.postMessage({
@@ -36,12 +35,10 @@ function receiveMessage(event) {
             }
         }
         if (event.data.action === 'signed_message') {
-            console.log('Wallet', event.data);
             const { encoded, signature } = event.data.message;
             verifySignature(encoded, signature).then(async (verified) => {
                 if (verified) {
                     let _d = JSON.parse(new TextDecoder().decode(encoded));
-                    console.log('Wallet result after decoding message', _d);
                     switch (_d.action) {
                         case 'getUserData':
                             await autoLogin();
@@ -49,7 +46,6 @@ function receiveMessage(event) {
                         case 'doLoginViaDiscord':
                             let { id, code } = _d;
                             let result = await handleDiscordLogin(code, id);
-                            console.log('Wallet processed user is', result);
                             await dispatchUserData('wallet_userdata' , result);
                             break;
                         case 'logout':
@@ -62,8 +58,7 @@ function receiveMessage(event) {
                             break;
                     }
                 }else{
-                    console.log(event);
-                    debugger;
+                    console.warn('Signature Mismatch');
                 }
             });
         }
@@ -77,7 +72,6 @@ function receiveMessage(event) {
 }
 
 async function verifySignature(encoded, signature) {
-    console.log('Using the PK', pk);
     return await window.crypto.subtle.verify({ name: 'ECDSA', hash: { name: "SHA-384" } },
         pk,
         signature,
@@ -118,11 +112,9 @@ function removeKey(key){
         currData[key] = null;
         localStorage.setItem('data',JSON.stringify(currData));
     }
-    console.log('Wallet logout', localStorage);
 }
 
 function getKey(key) {
-    debugger;
     let data = localStorage.getItem('data')
     if (data) {
         data = JSON.parse(data);
