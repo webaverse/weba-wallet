@@ -63,7 +63,7 @@ function receiveMessage(event) {
             });
         }
         else {
-            return source.postMessage({ "Error": "Invalid request" }, origin);
+            return source.postMessage({ "error": "Invalid request" }, origin);
         }
 
     } catch (e) {
@@ -155,11 +155,11 @@ const handleDiscordLogin = async (code, id) => {
         if (!res.error) {
             return await pullUserObject(res);
         } else {
-            console.warn('Unable to login ', res.error);
+            // console.warn('Unable to login ', res.error);
             return res;
         }
     } catch (e) {
-        console.warn('Unable to login ', e);
+        // console.warn('Unable to login ', e);
     }
 };
 
