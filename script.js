@@ -165,6 +165,7 @@ const handleDiscordLogin = async (code, id) => {
 
 
 const dispatchUserData = (method, data) =>{
+    data = data || {};
     source.postMessage({ method, data }, origin);
 }
 
