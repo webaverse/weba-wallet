@@ -31,7 +31,7 @@ const receiveMessage = async (event: MessageEvent) => {
   const { data, method } = req;
   if (method === "check_auth") {
     const jwt = localStorage.getItem("jwt");
-    console.log('found jwt', jwt);
+    console.log("found jwt", jwt);
     let auth = false;
     if (jwt) {
       try {
@@ -61,6 +61,48 @@ const receiveMessage = async (event: MessageEvent) => {
         body: JSON.stringify({
           address: data.address,
           signedMessage: data.signedMessage,
+        }),
+      });
+      let fetchResJson = await fetchRes.json();
+      if (fetchRes.status >= 400) {
+        return sendMessage({
+          data: null,
+          method: method,
+          type: "response",
+          error: "Authentication failed",
+        });
+      }
+      const jwtToken = fetchResJson.jwtToken;
+
+      await blockhcain.setupWallet(jwtToken);
+      localStorage.setItem("jwt", jwtToken);
+      sendMessage({
+        data: {
+          message: "Wallet initialized",
+        },
+        method: method,
+        type: "response",
+        error: null,
+      });
+    } catch (error) {
+      sendMessage({
+        data: null,
+        method: method,
+        type: "response",
+        error: error.message,
+      });
+    }
+  } else if (method === "initiate_wallet_discord") {
+    try {
+      let fetchRes = await fetch(`${config.authServerURL}/discord-login`, {
+        method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          discordid: data.discordid,
+          discordcode: data.discordcode,
         }),
       });
       let fetchResJson = await fetchRes.json();
