@@ -7,5 +7,5 @@ export const config = {
     abi: AccountsAbi.abi,
     address: "0xEE64CB0278f92a4A20cb8F2712027E89DE0eB85e",
   },
-  allowedOrigins: ["https://app.webaverse.com", "http://localhost:1234"],
+  allowedOrigins: ["https://app.webaverse.com", "http://localhost:1234", "http://localhost:3000"],
 };
